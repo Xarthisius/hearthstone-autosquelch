@@ -11,6 +11,8 @@ using Hearthstone_Deck_Tracker.Enums;
 using Hearthstone_Deck_Tracker.Plugins;
 using Hearthstone_Deck_Tracker.Utility;
 using Hearthstone_Deck_Tracker.Utility.HotKeys;
+using Hearthstone_Deck_Tracker.Utility.Logging;
+using Hearthstone_Deck_Tracker.LogReader;
 using Core = Hearthstone_Deck_Tracker.API.Core;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using MenuItem = System.Windows.Controls.MenuItem;
@@ -27,6 +29,7 @@ namespace Autosquelch
         private bool PluginRunning { get; set; }
 
         private bool AutosquelchDisabled { get; set; }
+        private uint lastGameHandle { get; set; }
 
         private bool ShouldTrySquelch => PluginRunning && GameInProgress && !AutosquelchDisabled;
 
@@ -49,7 +52,7 @@ To temporarily turn off the autosquelch, press Ctrl+Alt+D";
 
         public string Name => "Autosquelch";
 
-        public Version Version => new Version(0, 3);
+        public Version Version => new Version(0, 3, 1);
 
         public void OnButtonPress()
         {
@@ -59,10 +62,18 @@ To temporarily turn off the autosquelch, press Ctrl+Alt+D";
         {
             Squelched = false;
             PluginRunning = true;
+            lastGameHandle = 0;
 
             HotKeyManager.RegisterHotkey(DefaultHotKey, ToggleAutosquelch, "Toggle Autosquelch");
 
-            GameEvents.OnGameStart.Add(() => { Squelched = false; });
+            GameEvents.OnGameStart.Add(() => {
+                if (Core.Game.MetaData.ServerInfo?.GameHandle == lastGameHandle)
+                {
+                    return;
+                }
+                Squelched = false;
+                lastGameHandle = Core.Game.MetaData.ServerInfo?.GameHandle ?? 0;
+            });
             GameEvents.OnTurnStart.Add(activePlayer =>
             {
                 if (!Squelched)
